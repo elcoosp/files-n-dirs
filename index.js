@@ -1,27 +1,36 @@
-const fs = require('fs')
-const path = require('path')
-
-const writeFile = (path, data, options) =>
-  new Promise((reject, resolve) =>
-    fs.writeFile(path, data, options, e => (e ? reject(e) : resolve()))
-  )
-
-const mkdir = (path, mode, options) =>
-  new Promise((reject, resolve) =>
-    fs.mkdir(path, mode, e => (e ? reject(e) : resolve()))
-  )
+const fs = require('fs'),
+  path = require('path'),
+  { promisify } = require('util'),
+  writeFile = promisify(fs.writeFile),
+  mkdir = promisify(fs.mkdir)
 
 const mkDirsNFiles = (tree, currentDir = process.cwd()) => {
   if (currentDir !== process.cwd()) mkdir(currentDir)
 
-  tree.files &&
-    tree.files.forEach(fileName =>
-      writeFile(path.join(currentDir, fileName)).catch(console.log)
-    )
-
-  Object.keys(tree)
-    .filter(x => x !== 'files')
-    .forEach(f => mkDirsNFiles(tree[f], path.join(currentDir, f)))
+  return Promise.all([
+    tree.files &&
+      Promise.all(
+        tree.files.map(fileName =>
+          writeFile(path.join(currentDir, fileName), '')
+        )
+      ),
+    Object.keys(tree)
+      .filter(x => x !== 'files')
+      .reduce(
+        (acc, folder) =>
+          tree[folder]
+            ? acc.concat(
+                mkDirsNFiles(tree[folder], path.join(currentDir, folder))
+              )
+            : acc,
+        []
+      )
+  ])
 }
 
+// ### Test
+// mkDirsNFiles({
+//   dgf: { files: ['a', 'g', 'gfs'] },
+//   dfzegf: { files: ['a', 'g'] }
+// }).catch(console.log)
 module.exports = mkDirsNFiles
